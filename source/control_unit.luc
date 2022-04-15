@@ -1,0 +1,465 @@
+module control_unit (
+   input clk,  // clock
+   input rst,            // reset button (active low)
+   //output out,
+   
+   input decrease_timer,
+   input regfile_dataina[16],
+   input regfile_datainb[16],
+   
+   input p1_inc_button,
+   input p1_dec_button,
+   input p1_enter_button,
+   
+   input p2_inc_button,
+   input p2_dec_button,
+   input p2_enter_button,
+   
+   //output result[2],  // Output signal
+   
+   output alufn[6],
+   output asel[3],
+   output bsel[3],
+   //output alu_out_sel[2],
+   output regfile_write_address[4],
+   output regfile_read_address_a[4],
+   output regfile_read_address_b[4],
+   output we_regfile,
+   output next_sig[1],
+   output debug[4]
+) {
+  
+   player player_unit;
+  
+  .clk(clk){
+    fsm game_fsm={
+        GAMEOVER,
+        CHECK_SUM_PLAYER_SCORE,  // Select game mode (15, 10, 5)
+        SET_TIMER_5,
+        SET_TIMER_10,
+        SET_TIMER_15,
+        GENERATE_LED,
+        GET_LED_ANS,
+        OUTPUT_LED,
+        CHECK_TIMER,
+        BRANCH_TIMER,
+        DEC_TIMER,
+        START_IDLE,
+        CHECK_P1_ANS,
+        BRANCH_P1_EVAL,
+        INC_P1_SCORE,
+        CHECK_P1_SCORE,
+        BRANCH_P1_SCORE_EVAL,
+        CHECK_P2_ANS,
+        BRANCH_P2_EVAL,
+        INC_P2_SCORE,
+        CHECK_P2_SCORE,
+        BRANCH_P2_SCORE,
+        BRANCH_P2_SCORE_EVAL,
+        CHECK_P1_LB,
+        BRANCH_P1_LB,
+        DEC_P1_COUNT,
+        CHECK_P1_UB,
+        BRANCH_P1_UB,
+        INC_P1_COUNT,
+        RESET_P1_COUNT,
+        CHECK_P2_LB,
+        BRANCH_P2_LB,
+        DEC_P2_COUNT,
+        CHECK_P2_UB,
+        BRANCH_P2_UB,
+        INC_P2_COUNT,
+        RESET_P2_COUNT,
+        RESET_ROUND_P1,
+        RESET_ROUND_P2
+    };
+  }
+  sig only_one_button_pressed;
+   always {
+      // Init
+      player_unit.p1score = 16b0;
+      player_unit.p2score = 16b0;
+      
+      //Tracker for only one button being only one button pressed
+      only_one_button_pressed = p1_enter_button+p1_dec_button+p1_inc_button+p2_enter_button+p2_inc_button+p2_dec_button;
+      // standard Instruction Set unless otherwise overwritten by each case 
+      alufn = 0;
+      asel = 0; 
+      bsel = 0;
+      we_regfile = 0;
+      next_sig = 0;
+      regfile_write_address = 1111;
+      regfile_read_address_a = 0000;
+      regfile_read_address_b = 0000;
+      
+      debug = 6b000;
+      
+      if (rst){
+         game_fsm.d = game_fsm.CHECK_SUM_PLAYER_SCORE;  
+      }
+      else{
+         case(game_fsm.q) {
+            game_fsm.CHECK_SUM_PLAYER_SCORE:
+               player_unit.p1score = 16b0;
+               player_unit.p2score = 16b0;
+               //player_unit.p1score = regfile_dataina;
+               //player_unit.p2score = regfile_datainb;
+               
+               case(player_unit.out){
+                  default: game_fsm.d = game_fsm.SET_TIMER_5;
+                  6b0: game_fsm.d = game_fsm.SET_TIMER_15;
+                  b01: game_fsm.d = game_fsm.SET_TIMER_10;
+               }
+            
+            /* General - Set timer */
+            game_fsm.SET_TIMER_5:
+               alufn = 6b0;
+               asel = b101; 
+               bsel = b010;
+               we_regfile = b1;
+               regfile_write_address = b0101;
+               game_fsm.d = game_fsm.GENERATE_LED;
+            
+            game_fsm.SET_TIMER_10:
+               alufn = 6b0;
+               asel = b100; 
+               bsel = b010;
+               we_regfile = b1;
+               regfile_write_address = b0101;
+               game_fsm.d = game_fsm.GENERATE_LED;
+               
+            game_fsm.SET_TIMER_15:
+               alufn = 6b0;
+               asel = b011; 
+               bsel = b010;
+               we_regfile = b1;
+               regfile_write_address = b0101;
+               game_fsm.d = game_fsm.GENERATE_LED;
+            
+            /* General - Generate random numner */
+            game_fsm.GENERATE_LED:
+               next_sig = 1;
+               alufn = 6b0;
+               asel = b010;
+               bsel = b011;
+               we_regfile = b1;
+               regfile_write_address = b0110;
+               game_fsm.d = game_fsm.GET_LED_ANS;
+            
+            game_fsm.GET_LED_ANS:
+               alufn = 6b0;
+               asel = b010;
+               bsel = b100;
+               we_regfile = b1;
+               regfile_read_address_a = b0110;
+               regfile_write_address = b0100;
+               game_fsm.d = game_fsm.OUTPUT_LED;
+            
+            game_fsm.OUTPUT_LED:
+               alufn = 6b0;
+               asel = b000;
+               bsel = b010;
+               we_regfile = b1;
+               regfile_read_address_a = b0110;
+               regfile_write_address = b0111;
+               game_fsm.d = game_fsm.START_IDLE;
+
+            game_fsm.CHECK_TIMER:
+               alufn = b110011;
+               asel = b000;
+               bsel = b010;
+               we_regfile = b1;
+               regfile_read_address_a = b0101;
+               regfile_write_address = b1111;
+               game_fsm.d = game_fsm.BRANCH_TIMER;
+
+            game_fsm.BRANCH_TIMER:
+               regfile_read_address_b = b1111;
+               if (regfile_datainb[0]){                      //direct read in
+                  game_fsm.d = game_fsm.START_IDLE;        
+               }
+               else{
+                  game_fsm.d = game_fsm.DEC_TIMER;
+               }
+            
+            game_fsm.DEC_TIMER:
+               alufn = b000001;
+               asel = b000;
+               bsel = b001;
+               we_regfile = b1;
+               regfile_read_address_a = b0101;
+               regfile_write_address = b0101;
+               game_fsm.d = game_fsm.START_IDLE;
+          
+            game_fsm.RESET_ROUND_P1:
+               alufn = 6b0;
+               asel = b010;
+               bsel = b010;
+               we_regfile = b1;
+               regfile_write_address = b0010;
+               game_fsm.d = game_fsm.RESET_ROUND_P2;
+            
+            game_fsm.RESET_ROUND_P2:
+               alufn = 6b0;
+               asel = b010;
+               bsel = b010;
+               we_regfile = b1;
+               regfile_write_address = b0011;
+               game_fsm.d = game_fsm.CHECK_SUM_PLAYER_SCORE;
+        
+            game_fsm.START_IDLE:
+               if (decrease_timer){
+                  game_fsm.d = game_fsm.CHECK_TIMER;
+                }
+               else if (p1_enter_button && only_one_button_pressed){
+                  game_fsm.d = game_fsm.CHECK_P1_ANS;
+               }
+               else if (p2_enter_button && only_one_button_pressed){
+                  game_fsm.d = game_fsm.CHECK_P2_ANS;
+               }
+               else if (p1_inc_button && only_one_button_pressed){
+                  game_fsm.d = game_fsm.CHECK_P1_UB;
+               }
+               else if (p1_dec_button && only_one_button_pressed){
+                  game_fsm.d = game_fsm.CHECK_P1_LB;
+               }
+               else if (p2_inc_button && only_one_button_pressed){
+                  game_fsm.d = game_fsm.CHECK_P2_UB;
+               }
+               else if (p2_dec_button && only_one_button_pressed){
+                  game_fsm.d = game_fsm.CHECK_P2_LB;
+               }
+               else{
+                  game_fsm.d = game_fsm.START_IDLE;
+               }
+
+            /* Player 1 - Submit Ans */
+            game_fsm.CHECK_P1_ANS:
+               alufn = b110011;
+               asel = b000;
+               bsel = b000;
+               we_regfile = b1;
+               regfile_read_address_a = b0010;
+               regfile_read_address_b = b0100;
+               regfile_write_address = b1111;
+               game_fsm.d = game_fsm.BRANCH_P1_EVAL;
+            
+            game_fsm.BRANCH_P1_EVAL:
+               regfile_read_address_b = b1111;
+               if (regfile_datainb[0]){                      //direct read in
+                  game_fsm.d = game_fsm.INC_P1_SCORE;
+               }
+               else{
+                  game_fsm.d = game_fsm.RESET_P1_COUNT;
+               }
+            
+            game_fsm.INC_P1_SCORE:
+               alufn = 6b0;
+               asel = b000;
+               bsel = b001;
+               we_regfile = b1;
+               regfile_read_address_a = b0000;
+               regfile_write_address = b0000;
+               game_fsm.d = game_fsm.CHECK_P1_SCORE;
+            
+            game_fsm.CHECK_P1_SCORE:
+               alufn = b110011;
+               asel = b001;
+               bsel = b000;
+               we_regfile = b1;
+               regfile_read_address_b = b0000;
+               regfile_write_address = b1111;
+               game_fsm.d = game_fsm.BRANCH_P1_SCORE_EVAL;
+
+            game_fsm.BRANCH_P1_SCORE_EVAL:
+               regfile_read_address_b = b1111;
+               if (regfile_datainb[0]){                      //direct read in
+                  game_fsm.d = game_fsm.GAMEOVER;
+               }
+               else{
+                  game_fsm.d = game_fsm.RESET_ROUND_P1;
+               }
+
+            /* Player 2 - Submit Ans */
+            game_fsm.CHECK_P2_ANS:
+               alufn = b110011;
+               asel = b000;
+               bsel = b000;
+               we_regfile = b1;
+               regfile_read_address_a = b0011;
+               regfile_read_address_b = b0100;
+               regfile_write_address = b1111;
+               game_fsm.d = game_fsm.BRANCH_P2_EVAL;
+
+            game_fsm.BRANCH_P2_EVAL:
+               regfile_read_address_b = b1111;
+               if (regfile_datainb[0]){                      //direct read in
+                  game_fsm.d = game_fsm.INC_P2_SCORE;
+               }
+               else{
+                  game_fsm.d = game_fsm.RESET_P2_COUNT;
+               }
+            
+            game_fsm.INC_P2_SCORE:
+               alufn = 6b0;
+               asel = b000;
+               bsel = b001;
+               we_regfile = b1;
+               regfile_read_address_a = b0001;
+               regfile_write_address = b0001;
+               game_fsm.d = game_fsm.CHECK_P2_SCORE;
+            
+            game_fsm.CHECK_P2_SCORE:
+               alufn = b110011;
+               asel = b001;
+               bsel = b000;
+               we_regfile = b1;
+               regfile_read_address_b = b0001;
+               regfile_write_address = b1111;
+               game_fsm.d = game_fsm.BRANCH_P2_SCORE_EVAL;
+
+            game_fsm.BRANCH_P2_SCORE_EVAL:
+               regfile_read_address_b = b1111;
+               if (regfile_datainb[0]){                      //direct read in
+                  game_fsm.d = game_fsm.GAMEOVER;
+               }
+               else{
+                  game_fsm.d = game_fsm.RESET_ROUND_P1;
+               }
+            
+            /* Player 1 - Lower Bound Input */
+            game_fsm.CHECK_P1_LB:
+               alufn = b110011;
+               asel = b000;
+               bsel = b010;
+               we_regfile = b1;
+               regfile_read_address_a = b0010;
+               regfile_write_address = b1111;
+               game_fsm.d = game_fsm.BRANCH_P1_LB;
+
+            game_fsm.BRANCH_P1_LB:
+               regfile_read_address_b = b1111;
+               if (regfile_datainb[0]){                      //direct read in
+                  game_fsm.d = game_fsm.START_IDLE;
+               }
+               else{
+                  game_fsm.d = game_fsm.DEC_P1_COUNT;
+               }
+
+            game_fsm.DEC_P1_COUNT:
+               alufn = b000001;
+               asel = b000;
+               bsel = b001;
+               we_regfile = b1;
+               regfile_read_address_a = b0010;
+               regfile_write_address = b0010;
+               game_fsm.d = game_fsm.START_IDLE;
+
+            
+            /* Player 1 - Upper Bound Input */
+            game_fsm.CHECK_P1_UB:
+               alufn = b110011;
+               asel = b000;
+               bsel = b101;
+               we_regfile = b1;
+               regfile_read_address_a = b0010;
+               regfile_write_address = b1111;
+               game_fsm.d = game_fsm.BRANCH_P1_UB;
+
+            game_fsm.BRANCH_P1_UB:
+               regfile_read_address_b = b1111;
+               if (regfile_datainb[0]){                      //direct read in
+                  game_fsm.d = game_fsm.START_IDLE;
+               }
+               else{
+                  game_fsm.d = game_fsm.INC_P1_COUNT;
+               }
+
+            game_fsm.INC_P1_COUNT:
+               alufn = 6b0;
+               asel = b000;
+               bsel = b001;
+               we_regfile = b1;
+               regfile_read_address_a = b0010;
+               regfile_write_address = b0010;
+               game_fsm.d = game_fsm.START_IDLE;
+            
+            /* Player 1 - Reset COUNT */
+            game_fsm.RESET_P1_COUNT:
+               alufn = 6b0;
+               asel = b010;
+               bsel = b010;
+               we_regfile = b1;
+               regfile_write_address = b0010;
+               game_fsm.d = game_fsm.START_IDLE;
+
+             /* Player 2 - Lower Bound Input */
+            game_fsm.CHECK_P2_LB:
+               alufn = b110011;
+               asel = b000;
+               bsel = b010;
+               we_regfile = b1;
+               regfile_read_address_a = b0011;
+               regfile_write_address = b1111;
+               game_fsm.d = game_fsm.BRANCH_P2_LB;
+
+            game_fsm.BRANCH_P2_LB:
+               regfile_read_address_b = b1111;
+               if (regfile_datainb[0]){                      //direct read in
+                  game_fsm.d = game_fsm.START_IDLE;
+               }
+               else{
+                  game_fsm.d = game_fsm.DEC_P2_COUNT;
+               }
+
+            game_fsm.DEC_P2_COUNT:
+               alufn = b000001;
+               asel = b000;
+               bsel = b001;
+               we_regfile = b1;
+               regfile_read_address_a = b0011;
+               regfile_write_address = b0011;
+               game_fsm.d = game_fsm.START_IDLE;
+
+            
+            /* Player 2 - Upper Bound Input */
+            game_fsm.CHECK_P2_UB:
+               alufn = b110011;
+               asel = b000;
+               bsel = b101;
+               we_regfile = b1;
+               regfile_read_address_a = b0011;
+               regfile_write_address = b1111;
+               game_fsm.d = game_fsm.BRANCH_P2_UB;
+
+            game_fsm.BRANCH_P2_UB:
+               regfile_read_address_b = b1111;
+               if (regfile_datainb[0]){                      //direct read in
+                  game_fsm.d = game_fsm.START_IDLE;
+               }
+               else{
+                  game_fsm.d = game_fsm.INC_P2_COUNT;
+               }
+
+            game_fsm.INC_P2_COUNT:
+               alufn = 6b0;
+               asel = b000;
+               bsel = b001;
+               we_regfile = b1;
+               regfile_read_address_a = b0011;
+               regfile_write_address = b0011;
+               game_fsm.d = game_fsm.START_IDLE;
+            
+            /* Player 2 - Reset COUNT */
+            game_fsm.RESET_P2_COUNT:
+               alufn = 6b0;
+               asel = b010;
+               bsel = b010;
+               we_regfile = b1;
+               regfile_write_address = b0011;
+               game_fsm.d = game_fsm.START_IDLE;
+
+        }          
+    }
+
+}

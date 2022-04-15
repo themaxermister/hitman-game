@@ -1,0 +1,19 @@
+module number_to_digits (
+    input num[16],
+    output out[2][5]
+  ) {
+  sig diff[16];
+  always {
+    diff = num - 10;
+    out[0]=b00000;
+    out[1]=b00000;
+
+    if(num>9){
+      out[0]=diff[4:0];
+      out[1]=b00001;
+      }
+    else{
+      out[0]=num[4:0];
+    }
+  }
+}

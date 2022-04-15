@@ -1,0 +1,16 @@
+module player (
+    input p1score[16],
+    input p2score[16],
+    output out[2]
+  ) {
+  
+  sig x;
+  always {
+    x = p1score + p2score;
+    case(x) {
+      default: out = b10;
+      16b0: out = b00;
+      15b01: out = b01;
+    }
+  }
+}

@@ -1,0 +1,144 @@
+module beta_unit (
+    input clk,  // clock
+    input rst,  // reset
+    
+    // Buttons
+    input p1_start_button,
+    input p1_increase_button,
+    input p1_decrease_button,
+    input p2_start_button,
+    input p2_increase_button,
+    input p2_decrease_button,
+
+    
+    
+    // Result
+    output p1_score_out[16],
+    output p2_score_out[16],
+    output current_time[2][5],
+    output p1_current_ans[2][5],
+    output p2_current_ans[2][5],
+    output random_display[16],
+    
+    // DEBUG
+    output debug_slowclock,
+    output tempo,
+    output count_num[16]
+    
+  ) {
+  
+    //temp variables
+    sig inputAlu_a[16];
+    sig inputAlu_b[16];
+  
+    alu alu_unit;
+    count_ones count_ones_module;
+    number_to_digits num_to_dig_timer;
+    number_to_digits num_to_dig_p1counter;
+    number_to_digits num_to_dig_p2counter;
+    
+   .clk(clk){    
+    edge_detector game_timer_detector(#RISE(1), #FALL(0));
+    
+    .rst(rst){
+      dff seed[32];
+      control_unit game_cu;
+      regfile regfile_unit;  // Contains all game var
+      counter slow_timer(#SIZE(1),#DIV(26)); 
+    }
+    pn_gen rand_gen;
+  }
+
+  always {
+  
+    // Edge detector for timer
+    game_timer_detector.in = slow_timer.value; // timer detector
+    
+    //Timer signals to CU unit
+    game_cu.decrease_timer = game_timer_detector.out;
+    
+    //pass button press signal to CU unit
+    game_cu.p1_enter_button = p1_start_button;
+    game_cu.p1_inc_button = p1_increase_button;
+    game_cu.p1_dec_button = p1_decrease_button;
+    game_cu.p2_enter_button = p2_start_button;
+    game_cu.p2_inc_button = p2_increase_button;
+    game_cu.p2_dec_button = p2_decrease_button;
+
+      
+    //Setup REGFILE unit 
+    regfile_unit.we = game_cu.we_regfile;
+    regfile_unit.write_address = game_cu.regfile_write_address;
+   
+    regfile_unit.read_address_a = game_cu.regfile_read_address_a;
+    regfile_unit.read_address_b = game_cu.regfile_read_address_b;
+    
+    //bootstrap reg_b output to CU for convenient branching conditions
+    game_cu.regfile_dataina = regfile_unit.out_a; 
+    game_cu.regfile_datainb = regfile_unit.out_b;
+    
+    // Get answer
+    count_ones_module.in = regfile_unit.out_a;
+    
+    // Get random value
+    rand_gen.seed = seed.q;
+    rand_gen.next = game_cu.next_sig;
+    rand_gen.rst = rst;                  // connect rst by default
+    
+    
+    //Decode timer_regfile to give inputs into the multi_seven_seg
+    //num_to_dig.num = regfile_unit.current_timer;
+    
+     //Decode timer_regfile to give inputs into the multi_seven_seg
+      num_to_dig_timer.num = regfile_unit.current_timer;
+      num_to_dig_p1counter.num = regfile_unit.p1_ans;
+      num_to_dig_p2counter.num = regfile_unit.p2_ans;
+    
+    
+    //asel mux
+    case(game_cu.asel){
+      b000  : inputAlu_a = regfile_unit.out_a;
+      b001  : inputAlu_a = 3; 
+      b010  : inputAlu_a = 0;
+      b011  : inputAlu_a = 15;
+      b100  : inputAlu_a = 10;
+      b101  : inputAlu_a = 5;
+      default :
+          inputAlu_a = 0;
+    }
+    
+    //bsel mux
+    case(game_cu.bsel){
+      b000  : inputAlu_b = regfile_unit.out_b;
+      b001  : inputAlu_b = 1; 
+      b010  : inputAlu_b = 0;
+      b011  : inputAlu_b = rand_gen.num[28:13];   //RNG from FSM
+      b100  : inputAlu_b = count_ones_module.out; // Counter
+      b101  : inputAlu_b = 16;
+      default :
+          inputAlu_b = 0;
+    }
+    
+    //ALU
+    alu_unit.a = inputAlu_a;
+    alu_unit.b = inputAlu_b;
+    alu_unit.alufn_signal = game_cu.alufn;
+    
+    //wdsel mux
+    regfile_unit.data = alu_unit.s;
+    
+    // Debugging
+    p1_score_out = regfile_unit.p1_score;
+    p2_score_out = regfile_unit.p2_score;
+    current_time[0] = num_to_dig_timer.out[0];
+    current_time[1] = num_to_dig_timer.out[1];
+    p1_current_ans[0] = num_to_dig_p1counter.out[0];
+    p1_current_ans[1] = num_to_dig_p1counter.out[1];
+    p2_current_ans[0] = num_to_dig_p2counter.out[0];
+    p2_current_ans[1] = num_to_dig_p2counter.out[1];
+    random_display = regfile_unit.random_out;
+    debug_slowclock = slow_timer.value;
+    tempo = game_timer_detector.out;
+    count_num = regfile_unit.current_lighted_leds;
+  }
+}

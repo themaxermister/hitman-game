@@ -1,0 +1,97 @@
+module regfile (
+    input clk,  // clock
+    input rst,  // reset
+    
+    input write_address[4], // write address - Rc
+    input we, // write enable
+    input data[16], // data input
+    
+    input read_address_a[4], //address port a Ra
+    input read_address_b[4], //address port b Rb
+    output out_a[16], //read port a Ra
+    output out_b[16], //read port b read_address_b
+    
+    // Debug
+    output p1_score[16],
+    output p2_score[16],
+    output p1_ans[16],
+    output p2_ans[16],
+    output current_lighted_leds[16],  // Number of leds lighted
+    output current_timer[16],
+    output random_out[16],
+    output temp_var[16]
+    
+  ) {
+  
+   .clk(clk){
+    .rst(rst){
+      dff reg_p1_score[16];
+      dff reg_p2_score[16];
+      dff reg_p1_ans[16];
+      dff reg_p2_ans[16];
+      dff reg_current_lighted_leds[16];  // Number of leds lighted
+      dff reg_current_timer[16];
+      dff random_num_notout[16];  // Generated nt value
+      dff random_num_out[16];  // Generated nt value
+      dff reg_temp_var[16];
+    }
+  }
+
+  always {
+  
+    if (we){
+      // Write [we:1]
+      case(write_address){
+          b0000 : reg_p1_score.d = data;
+          b0001 : reg_p2_score.d = data;
+          b0010 : reg_p1_ans.d = data;
+          b0011 : reg_p2_ans.d = data;
+          b0100 : reg_current_lighted_leds.d = data;
+          b0101 : reg_current_timer.d = data;
+          b0110 : random_num_notout.d = data;
+          b0111 : random_num_out.d = data;
+          b1111 : reg_temp_var.d = data;
+        }
+    }
+    
+      //read port a
+      case(read_address_a){
+          b0000 : out_a = reg_p1_score.q;
+          b0001 : out_a = reg_p2_score.q;
+          b0010 : out_a = reg_p1_ans.q;
+          b0011 : out_a = reg_p2_ans.q;
+          b0100 : out_a = reg_current_lighted_leds.q;
+          b0101 : out_a = reg_current_timer.q;
+          b0110 : out_a = random_num_notout.q;
+          b0111 : out_a = random_num_out.q;
+          b1110 : out_a = 16b0;
+          b1111 : out_a = reg_temp_var.q;
+          default : out_a = 0;
+      }
+    
+    //read port a
+      case(read_address_b){
+          b0000 : out_b = reg_p1_score.q;
+          b0001 : out_b = reg_p2_score.q;
+          b0010 : out_b = reg_p1_ans.q;
+          b0011 : out_b = reg_p2_ans.q;
+          b0100 : out_b = reg_current_lighted_leds.q;
+          b0101 : out_b = reg_current_timer.q;
+          b0110 : out_b = random_num_notout.q;
+          b0111 : out_b = random_num_out.q;
+          b1110 : out_b = 16b0;
+          b1111 : out_b = reg_temp_var.q;
+          default : out_b = 0;
+      }
+    
+      // For debugging
+      p1_score = reg_p1_score.q;
+      p2_score = reg_p2_score.q;
+      p1_ans = reg_p1_ans.q;
+      p2_ans = reg_p2_ans.q;
+      random_out = random_num_notout.q;
+      temp_var = reg_temp_var.q;
+      current_timer = reg_current_timer.q;
+      current_lighted_leds = reg_current_lighted_leds.q;
+  }
+}
