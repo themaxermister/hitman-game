@@ -41,7 +41,6 @@ module beta_unit (
     edge_detector game_timer_detector(#RISE(1), #FALL(0));
     
     .rst(rst){
-      dff seed[32];
       control_unit game_cu;
       regfile regfile_unit;  // Contains all game var
       counter slow_timer(#SIZE(1),#DIV(26)); 
@@ -81,9 +80,8 @@ module beta_unit (
     count_ones_module.in = regfile_unit.out_a;
     
     // Get random value
-    rand_gen.seed = seed.q;
     rand_gen.next = game_cu.next_sig;
-    rand_gen.rst = rst;                  // connect rst by default
+                      // connect rst by default
     
     
     //Decode timer_regfile to give inputs into the multi_seven_seg
