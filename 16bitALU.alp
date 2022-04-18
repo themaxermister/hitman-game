@@ -22,8 +22,8 @@
     <src>seven_seg.luc</src>
     <src>number_to_digits.luc</src>
     <src>control_unit.luc</src>
-    <src>player.luc</src>
     <component>decoder.luc</component>
+    <src>score_decoder.luc</src>
     <constraint>custom.acf</constraint>
     <constraint>au.xdc</constraint>
   </files>

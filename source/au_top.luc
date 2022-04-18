@@ -1,110 +1,196 @@
 module au_top (
     input clk,              // 100MHz clock
-    input rst_n,            // reset button (active low)
+    input rst_n,            // reset button (active low). We overwrite this with the reset_button input.
     input usb_rx,           // USB->Serial input
     output usb_tx,          // USB->Serial output
     
-    input io_button [5],    // 5 buttons on IO Shield
+    
+    // Default IO Button Inputs and DIP switch inputs
+    //input io_button [5],    // 5 buttons on IO Shield
     //input io_dip [3][8],    // DIP switches on IO Shield
-    output io_led [3][8],   // LEDs on IO Shield
-    output io_seg [8],      // 7-segment LEDs on IO Shield
-    output io_sel [4],      // Digit select on IO Shield
-    output custom_out_A[32],      // Output banks
-    output custom_out_B[32],
-    output custom_out_C[32]
+    
+    // Default IO LED Outputs
+    //output io_led[3][8],
+    /*
+    // Default IO Seven Seg Outputs
+    output io_sel[4],
+    output io_seg[8],*/
+    
+    // --- Custom Bank Inputs ---
+    // Player 1 Buttons
+    input p1_inc_button,
+    input p1_enter_button,
+    input p1_dec_button,
+    // Player 2 Buttons
+    input p2_inc_button,
+    input p2_enter_button,
+    input p2_dec_button,
+    // Miscellaneous Buttons
+    input reset_button, // reset button
+    
+    
+    // --- Custom Bank Outputs ---
+    // Player 1 Seven Seg (Current Count)
+    output p1_seg[7], // Segments
+    output p1_sel[2], // Selectors
+    // Player 2 Seven Seg (Current Count)
+    output p2_seg[7], // Segments
+    output p2_sel[2], // Selectors
+    // Timer Seven Seg
+    output timer_seg[7], // Segments
+    output timer_sel[2], // Selectors
+    
+    // Custom LED Matrix Output
+    output led_matrix[16],
+    
+    // Score LEDs
+    // Player 1 Score LEDs
+    output p1_score_led[3],
+    // Player 2 Score LEDs
+    output p2_score_led[3]
   ) {
   
-    sig rst;                  // reset signal
+    sig rst; // reset signal
+    var i; // for for loop
+      
+    // --- Score Decoders: Convert from a 2-bit input into 3-bit number for LEDs---
+    score_decoder p1_score_decoder;
+    score_decoder p2_score_decoder;
   
     .clk(clk) {
-      
-      // The reset conditioner is used to synchronize the reset signal to the FPGA
-      // clock. Ensures the entire FPGA comes out of reset at the same time.
       .rst(rst){
         beta_unit game_beta;
-        multi_seven_seg ledseg(#DIGITS(2));
+      
+        // Converts a 16-bit number into the appropriate input for seven seg
+        multi_seven_seg p1_mss(#DIGITS(2));
+        multi_seven_seg p2_mss(#DIGITS(2));
+        multi_seven_seg timer_mss(#DIGITS(2));
       }
-    
+      
+      // --- Reset Conditioner: Used to synchronise reset signal to FPGA clock. Ensures entire FPGA leaves reset at the same time. ---
       reset_conditioner reset_cond;
+    
+      // --- Edge Detectors ---
+      // Player 1 Edge Detectors
       edge_detector edge_dt_start_btn_p1 (#RISE(1), #FALL(0));
       edge_detector edge_dt_increase_btn_p1 (#RISE(1), #FALL(0));
       edge_detector edge_dt_decrease_btn_p1 (#RISE(1), #FALL(0));
-
-
+      // Player 2 Edge Detectors
       edge_detector edge_dt_start_btn_p2(#RISE(1), #FALL(0));
       edge_detector edge_dt_increase_btn_p2 (#RISE(1), #FALL(0));
       edge_detector edge_dt_decrease_btn_p2 (#RISE(1), #FALL(0));
     
-  
-      button_conditioner btn_cond_p1_enter;
-      button_conditioner btn_cond_p1_increase;
-      button_conditioner btn_cond_p1_decrease;
-      button_conditioner btn_cond_p2_enter;
-      button_conditioner btn_cond_p2_increase;
-      button_conditioner btn_cond_p2_decrease;
+      // --- Button Conditioners ---
+      button_conditioner btn_cond_p1_enter(#MIN_DELAY(50));
+      button_conditioner btn_cond_p1_increase(#MIN_DELAY(50));
+      button_conditioner btn_cond_p1_decrease(#MIN_DELAY(50));
+      button_conditioner btn_cond_p2_enter(#MIN_DELAY(50));
+      button_conditioner btn_cond_p2_increase(#MIN_DELAY(50));
+      button_conditioner btn_cond_p2_decrease(#MIN_DELAY(50));
   }
     
   always {
-    reset_cond.in = ~rst_n; // input raw inverted reset signal
-    rst = io_button[4];//reset_cond.out;   // conditioned reset
     usb_tx = usb_rx;        // loop serial port
+    // (Original Reset Condition based on reset signal)
+    /*
+    reset_cond.in = ~rst_n; // input raw inverted reset signal
+    rst = reset_cond.out; //conditioned reset
+    */
+    //rst = reset_button; //reset_button;
+    reset_cond.in = reset_button;
+    rst = reset_cond.out;
+    //io_led = 3x{{8h00}};
     
-    // Reset all hardware
-    io_led = 3x{{8h00}};    // turn LEDs off
-    io_seg = 8hff;          // turn segments off
+    // --- Reset all hardware ---
+    // (Original Initialisation Step for IO components)
+    //io_led = 3x{{8h00}};    // turn LEDs off
+    //io_seg = 8hff;          // turn segments off
     //io_sel = 4hf;           // select no digits
     
+    // (Initialisation Step for external components)
+    // Initialise Seven Segments
+    p1_seg = 0;
+    p1_sel = 0;
+    p2_seg = 0;
+    p2_sel = 0;
+    timer_seg = 0;
+    timer_sel = 0;
+    
+    // Initialise LED Matrix
+    //led_matrix = 0;
+    
+    // Initialise Score LEDs
+    p1_score_led = 0;
+    p2_score_led = 0;
+    
+    // Initialise multi seven seg input
+    p1_mss.values    = 2x{{5b0}};
+    p2_mss.values    = 2x{{5b0}};
+    timer_mss.values = 2x{{5b0}};
+    
+    // Initialise score decoders
+    p1_score_decoder.in = b00;
+    p2_score_decoder.in = b00;
     
     
-    // Detect button press //to reduce the bouncing effects of your button 
-    btn_cond_p1_enter.in=io_button[2]; // Change btn input from here
-    btn_cond_p1_increase.in=io_button[2];
-    btn_cond_p1_decrease.in=io_button[2]; 
-    btn_cond_p2_enter.in=io_button[0];
-    btn_cond_p2_increase.in=io_button[1];
-    btn_cond_p2_decrease.in=io_button[3];
+    // --- Initialise Button Conditioners ---
+    // Connect Button Conditioners to ensure only single input
+    btn_cond_p1_enter.in    = p1_enter_button; 
+    btn_cond_p1_increase.in = p1_inc_button;
+    btn_cond_p1_decrease.in = p1_dec_button; 
+    btn_cond_p2_enter.in    = p2_enter_button;
+    btn_cond_p2_increase.in = p2_inc_button;
+    btn_cond_p2_decrease.in = p2_dec_button;
     
-
-    //get the edge of button press
-    edge_dt_start_btn_p1.in=btn_cond_p1_enter.out; 
-    edge_dt_increase_btn_p1.in=btn_cond_p1_increase.out;
-    edge_dt_decrease_btn_p1.in=btn_cond_p1_decrease.out; 
-    edge_dt_start_btn_p2.in=btn_cond_p2_enter.out; 
-    edge_dt_increase_btn_p2.in=btn_cond_p2_increase.out;
-    edge_dt_decrease_btn_p2.in=btn_cond_p2_decrease.out; 
-    
-
-
+    // Get the edge of button press
+    edge_dt_start_btn_p1.in    = btn_cond_p1_enter.out; 
+    edge_dt_increase_btn_p1.in = btn_cond_p1_increase.out;
+    edge_dt_decrease_btn_p1.in = btn_cond_p1_decrease.out; 
+    edge_dt_start_btn_p2.in    = btn_cond_p2_enter.out; 
+    edge_dt_increase_btn_p2.in = btn_cond_p2_increase.out;
+    edge_dt_decrease_btn_p2.in = btn_cond_p2_decrease.out; 
     
     // Pass button value to beta machine
-    game_beta.p1_start_button = edge_dt_start_btn_p1.out;
+    game_beta.p1_start_button    = edge_dt_start_btn_p1.out;
     game_beta.p1_increase_button = edge_dt_increase_btn_p1.out;
     game_beta.p1_decrease_button = edge_dt_decrease_btn_p1.out;
-    game_beta.p2_start_button = edge_dt_start_btn_p2.out;
+    game_beta.p2_start_button    = edge_dt_start_btn_p2.out;
     game_beta.p2_increase_button = edge_dt_increase_btn_p2.out;
     game_beta.p2_decrease_button = edge_dt_decrease_btn_p2.out;
     
     
-    //TestTimer
-    //ledseg.values[0]=game_beta.current_time[0];
-    //ledseg.values[1]=game_beta.current_time[1];
+    // --- Connect MSS ---
+    p1_mss.values    = game_beta.p1_current_ans;
+    p2_mss.values    = game_beta.p2_current_ans;
+    timer_mss.values = game_beta.current_time;
     
-    //Test P1 counter
-    ledseg.values[0]=game_beta.current_time[0];
-    ledseg.values[1]=game_beta.current_time[1];
-
-    //io_led[0] = game_beta.debug_slowclock;
-    io_seg = ~ledseg.seg;
-    io_sel = ~ledseg.sel;
     
-    //display ledseg
-    io_led[0] = game_beta.random_display[7:0];
-    io_led[1] = game_beta.random_display[15:8];
-    io_led[2] = game_beta.p2_score_out[7:0];
+    // --- Connect Actual Scores to score_decoders ---
+    p1_score_decoder.in = game_beta.p1_score_out[1:0];
+    p2_score_decoder.in = game_beta.p2_score_out[1:0];
     
-    custom_out_A = 0;
-    custom_out_B = 0;
-    custom_out_C = 0;
-
+    
+    // --- Connect Seven Segs ---
+    // Connect P1 Counter
+    p1_seg =  p1_mss.seg;
+    p1_sel = ~p1_mss.sel;
+    // Connect P2 Counter
+    p2_seg =  p2_mss.seg;
+    p2_sel = ~p2_mss.sel;
+    // Connect Timer Counter
+    timer_seg =  timer_mss.seg;
+    timer_sel = ~timer_mss.sel;
+    
+    // --- Connect LED Matrix ---
+    for (i = 0; i < 16; i++) {
+      led_matrix[i] = game_beta.random_display[i];
+    }
+    
+    
+    // --- Connect Score LEDs to decoded scores ---
+    for (i = 0; i < 3; i++) {
+      p1_score_led[i] = p1_score_decoder.out[i];
+      p2_score_led[i] = p2_score_decoder.out[i];
+    }
   }
 }

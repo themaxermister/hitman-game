@@ -32,9 +32,7 @@
    The output, num, is updated when next is high. Next can be tied high for
    continuous number generation.
    
-   The module can be reset with seed set to the same input to generate the 
-   exact same sequence of "random" numbers. By setting a different seed on
-   a reset you can generate a different set of random numbers.
+   Modification: RST was removed, to prevent the LEDs from following the exact same sequence upon game restart.
 */
 
 module pn_gen #(

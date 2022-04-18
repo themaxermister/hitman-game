@@ -37,16 +37,16 @@ module beta_unit (
     number_to_digits num_to_dig_p1counter;
     number_to_digits num_to_dig_p2counter;
     
-   .clk(clk){    
-    edge_detector game_timer_detector(#RISE(1), #FALL(0));
+    .clk(clk){    
+      edge_detector game_timer_detector(#RISE(1), #FALL(0));
     
-    .rst(rst){
-      control_unit game_cu;
-      regfile regfile_unit;  // Contains all game var
-      counter slow_timer(#SIZE(1),#DIV(26)); 
+      .rst(rst){
+        control_unit game_cu;
+        regfile regfile_unit;  // Contains all game var
+        counter slow_timer(#SIZE(1),#DIV(26)); 
+      }
+      pn_gen rand_gen;
     }
-    pn_gen rand_gen;
-  }
 
   always {
   
@@ -87,10 +87,10 @@ module beta_unit (
     //Decode timer_regfile to give inputs into the multi_seven_seg
     //num_to_dig.num = regfile_unit.current_timer;
     
-     //Decode timer_regfile to give inputs into the multi_seven_seg
-      num_to_dig_timer.num = regfile_unit.current_timer;
-      num_to_dig_p1counter.num = regfile_unit.p1_ans;
-      num_to_dig_p2counter.num = regfile_unit.p2_ans;
+    //Decode timer_regfile to give inputs into the multi_seven_seg
+    num_to_dig_timer.num = regfile_unit.current_timer;
+    num_to_dig_p1counter.num = regfile_unit.p1_ans;
+    num_to_dig_p2counter.num = regfile_unit.p2_ans;
     
     
     //asel mux
