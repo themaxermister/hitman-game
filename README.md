@@ -9,7 +9,7 @@ A game where two players can compete against each other to see who is the fastes
 - 4x4 matrix of yellow LEDs represents the random number
 - Use of buttons to increase, decrease and submit the answer input
 
-### Game structure
+### Game Structure
 
 Every time the number is matched by the quicker participant, the round ends and the winning participant will be awarded with a point represented by a lit up blue LED. The first player who achieves 3 points first will win, with 3 lit up blue LEDs.
 
